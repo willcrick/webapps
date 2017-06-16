@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Grab your extent in multiple coordinate systems...</title>
-    <link rel="stylesheet" type="text/css" href="http://serverapi.arcgisonline.com/jsapi/arcgis/2.1/js/dojo/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" type="text/css" href="https://serverapi.arcgisonline.com/jsapi/arcgis/2.1/js/dojo/dijit/themes/claro/claro.css">
     <style type="text/css">
       html, body {
         height: 100%;
@@ -89,7 +89,7 @@
         parseOnLoad: false,
       };
     </script>
-    <script type="text/javascript" src="http://serverapi.arcgisonline.com/jsapi/arcgis/?v=2.1">
+    <script type="text/javascript" src="https://serverapi.arcgisonline.com/jsapi/arcgis/?v=2.1">
     </script>
     <script type="text/javascript">
       
@@ -160,7 +160,7 @@
         var wkid = globals.map.spatialReference.wkid;
                 
         //add geometry service to globals variable
-        globals.geometryService = new esri.tasks.GeometryService('http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer');
+        globals.geometryService = new esri.tasks.GeometryService('https://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer');
        
         //init toolbar
         globals.tb = new esri.toolbars.Draw(globals.map);
