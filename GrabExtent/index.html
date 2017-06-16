@@ -128,7 +128,7 @@
         esriConfig.defaults.io.alwaysUseProxy = false;
         var initExtent = new esri.geometry.Extent({"xmin":-2126816.7802941445,"ymin":6229708.367155589,"xmax":1096346.525935669,"ymax":8388493.728574522,"spatialReference":{"wkid":102100}});
         globals.map = new esri.Map("mapPane", {extent:initExtent});
-				var sitesMap = new esri.layers.ArcGISDynamicMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer");
+				var sitesMap = new esri.layers.ArcGISDynamicMapServiceLayer("https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer");
         globals.map.addLayer(sitesMap);
         
         //Connect resize map function, hide the loading overlay and call application init method
