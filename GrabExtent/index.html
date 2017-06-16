@@ -1,0 +1,304 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Grab your extent in multiple coordinate systems...</title>
+    <link rel="stylesheet" type="text/css" href="http://serverapi.arcgisonline.com/jsapi/arcgis/2.1/js/dojo/dijit/themes/claro/claro.css">
+    <style type="text/css">
+      html, body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+      }
+      
+      body {
+        background-color: white;
+        overflow: hidden;
+        font-family: "Trebuchet MS";
+      }
+      
+      h1, p {
+        margin: 5px;
+      }
+      
+      #mainWindow {
+        width: 100%;
+        height: 100%;
+      }
+      
+      #loading {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #fff url('ajax-loader.gif') no-repeat center center;
+        position: absolute;
+        z-index: 999;
+      }
+      
+      #leftPane {
+        margin: 5px;
+        margin-right: 0px;
+        padding: 2px;
+        background-color: white;
+        border: solid 2px #92BCE1;
+        width: 21%;
+      }
+      
+      #mapPane {
+        margin: 5px;
+        margin-left: 0px;
+        padding: 2px;
+        border: solid 2px #92BCE1;
+      }
+      
+      #footerPane {
+        height: 30px;
+        margin: 5px;
+        margin-top: 0px;
+        padding: 2px;
+        border: solid 2px #92BCE1;
+      }
+      
+      #headerPane {
+        height: 60px;
+        margin: 5px;
+        margin-bottom: 0px;
+        padding: 2px;
+        border: solid 2px #92BCE1;
+      }
+      
+      #mapScale {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        z-index: 999;
+      }
+			
+      #currentMapWkid {
+        position: absolute;
+        bottom: 30px;
+        left: 10px;
+        z-index: 999;
+      }
+      
+    </style>
+    <script type="text/javascript">
+      djConfig = {
+        //set parseOnLoad to false so we can initizialize dijits ourselves when we the page is loaded
+        parseOnLoad: false,
+      };
+    </script>
+    <script type="text/javascript" src="http://serverapi.arcgisonline.com/jsapi/arcgis/?v=2.1">
+    </script>
+    <script type="text/javascript">
+      
+      //this global object will contain global references needed across all functions
+      var globals = {
+        tb: null,
+        map: null,
+        geometryService: null
+      };
+      
+      function loadMoreResources(){
+        //load more stuff now that page and main APIs have loaded, loading icon is still spinning
+        dojo.require("dijit.layout.BorderContainer");
+        dojo.require("dijit.layout.ContentPane");
+        dojo.require("esri.map");
+        dojo.require("esri.toolbars.draw");
+        dojo.require("dijit.layout.AccordionContainer")
+        dojo.require("dijit.layout.TabContainer")
+        dojo.require("dojo.parser");
+        dojo.require("dijit.form.Button");
+        dojo.require("dijit.form.ValidationTextBox");
+        dojo.require("dijit.form.Form");
+        dojo.require("dijit.form.Textarea");
+        dojo.require("dijit.form.TextBox");
+        dojo.require("esri.tasks.geometry");
+        
+        //wait for these additional resources to load and call initialise method
+        dojo.addOnLoad(initialiseDijitsAndTemplate);
+      }
+      
+      function initialiseDijitsAndTemplate(){
+        //now all resources have loaded, parse the page and initialise the border container dijits
+        dojo.parser.parse();
+        
+        //initialise the map
+        esriConfig.defaults.io.alwaysUseProxy = false;
+        var initExtent = new esri.geometry.Extent({"xmin":-2126816.7802941445,"ymin":6229708.367155589,"xmax":1096346.525935669,"ymax":8388493.728574522,"spatialReference":{"wkid":102100}});
+        globals.map = new esri.Map("mapPane", {extent:initExtent});
+				var sitesMap = new esri.layers.ArcGISDynamicMapServiceLayer("http://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer");
+        globals.map.addLayer(sitesMap);
+        
+        //Connect resize map function, hide the loading overlay and call application init method
+        dojo.connect(globals.map, 'onLoad', function(map){
+          //connect resize function
+          dojo.connect(dijit.byId('mapPane'), 'resize', resizeMap);
+          
+          //Hide the loading image overlay once the map is fully loaded
+          dojo.style('loading', 'display', 'none');
+          
+          //call application init function
+          initialiseApplication();
+        });
+      }
+      
+      function resizeMap(){
+        //resize the map when the browser resizes - view the 'How do I resize the map when the window resizes?' section in
+        //the Frequently Asked Questions section for more details: http://help.arcgis.com/EN/webapi/javascript/arcgis/help/jshelp/inside_faq.htm
+        var resizeTimer;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function(){
+          globals.map.resize();
+          globals.map.reposition();
+        }, 500);
+      }
+      
+      function initialiseApplication(){
+        //Get the map wkid and call the method to set the inital state of the projection buttons
+        var wkid = globals.map.spatialReference.wkid;
+                
+        //add geometry service to globals variable
+        globals.geometryService = new esri.tasks.GeometryService('http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer');
+       
+        //init toolbar
+        globals.tb = new esri.toolbars.Draw(globals.map);
+        
+        //connect scale form submission to set scale method
+        dojo.connect(dijit.byId("scaleForm"), "onSubmit", function(e){
+          e.preventDefault();
+          setScale();
+        });
+        
+        //connect change wkid button
+        dojo.connect(dijit.byId("wkidForm"), "onSubmit", function(e){
+          e.preventDefault();
+          changeMapProjection();
+        });
+        
+        //connect the showExtentGeometry function to the draw end event
+        dojo.connect(globals.tb, "onDrawEnd", showExtentGeometry);
+      
+        //connect update scale method to zoom end event
+        dojo.connect(globals.map, 'onZoomEnd', displayScale);
+        
+        //show initial scale on map load
+        displayScale();
+        
+        //show current map wkid
+        displayWkid();
+      }
+      
+      function setScale(){
+        //set the scale of the map based on the user input
+        var scale = dojo.byId('scaleInput').value;
+        var extent = esri.geometry.getExtentForScale(globals.map, scale);
+        globals.map.setExtent(extent);
+      }
+      
+      function changeMapProjection(){
+        //get current extent from the map and reproject to desired datum
+        var wkid = parseInt(dijit.byId("wkidInput").get("value"));
+        debugger;
+        if (wkid){
+          //reproject extent of the map and set extent if wkid is different
+          var extent = globals.map.extent;
+          if (extent.spatialReference.wkid != wkid) {
+            reprojectGeometry(wkid, extent, function(geometries){ 
+              debugger;
+              globals.map.setExtent(geometries[0]);
+              globals.map.spatialReference = geometries[0].spatialReference;
+              displayWkid();
+            });
+          }
+        }
+      }
+      
+      function showExtentGeometry(geometry){
+        //get the extent geometry, reproject if wkid value is present and call setGeometryOutput
+        var wkid = parseInt(dijit.byId("extentWkidInput").get("value"));
+        
+        if (wkid && globals.map.spatialReference.wkid != wkid) {
+          reprojectGeometry(wkid, geometry, function(geometries){ 
+            setGeometryOutput(geometries[0]); 
+          });
+        } else {
+          setGeometryOutput(geometry);
+        }
+        globals.tb.deactivate();
+      }
+      
+      function displayScale(){
+        //display the scale 
+        var scaleText = Math.round(esri.geometry.getScale(globals.map));
+        dojo.byId("mapScale").innerHTML = 'Map Scale: ' + scaleText;
+      }
+      
+      function displayWkid(){
+        //display the current map WKID
+        var wkid = globals.map.spatialReference.wkid;
+        dojo.byId("currentMapWkid").innerHTML = 'Map Wkid: ' + wkid;
+      }
+        
+      function setGeometryOutput(geometry){
+        //display the extent geometry json in output textarea
+        dijit.byId("extentOutput").set("value", dojo.toJson(geometry.toJson()));
+      }
+      
+      function reprojectGeometry(wkid, geometry, callback){
+        //call geometry service to reproject a geometry
+        var outSr = new esri.SpatialReference({
+          'wkid': wkid
+        });
+        globals.geometryService.project([geometry], outSr, callback);
+      }
+      
+      //when the main page has loaded, load some additional resources
+      dojo.addOnLoad(loadMoreResources);
+			
+    </script>
+  </head>
+  <body class="claro">
+    <div id="loading">
+      <!-- Loading image overlay-->
+    </div>
+    <div dojotype="dijit.layout.BorderContainer" id="mainWindow" design="headline" gutters="false" livesplitters="true">
+      <div dojotype="dijit.layout.ContentPane" id="headerPane" region="top">
+        <h1>Grab an extent from the map in any coordinate system</h1>
+        <p>Change the map's wkid, map scale or set the extents output wkid (if different from the map) as you like. <br/>
+        Click the Draw Extent button and draw an extent on the map, the JSON geometry representation of the extent will appear before your very eyes.</p>
+      </div>
+      <div dojotype="dijit.layout.ContentPane" id="leftPane" region="leading" splitter="true">
+        <div dojotype="dijit.layout.AccordionContainer">
+          <div dojotype="dijit.layout.ContentPane" title="Tools">
+            <p><b>Change map scale:</b></p>
+            <div dojotype="dijit.form.Form" id="scaleForm" action="" method="">
+              <input dojotype="dijit.form.ValidationTextBox" id="scaleInput" type="text" regExp="\d+" trim="true" style="width: 8em;" placeHolder="optional"/><button dojotype="dijit.form.Button" id="scaleButton" type="submit" label="Go"/>
+            </div>
+            <p><b>Change map wkid:</b></p>
+            <div dojotype="dijit.form.Form" id="wkidForm" action="" method="">
+              <input dojotype="dijit.form.ValidationTextBox" id="wkidInput" type="text" regExp="\d+" trim="true" style="width: 8em;" placeHolder="optional"/><button dojotype="dijit.form.Button" id="wkidButton" type="submit" label="Go"/>
+            </div>
+            <p><b>Grab Extent:</b></p>
+            <div dojotype="dijit.form.Form" id="extentForm" action="" method="">
+              Output Wkid:<input dojotype="dijit.form.ValidationTextBox" id="extentWkidInput" type="text" regExp="\d+" trim="true" style="width: 5em;" placeHolder="optional"/>
+              <button dojotype="dijit.form.Button" onclick="globals.tb.activate(esri.toolbars.Draw.EXTENT);" id="extentButton" type="button" label="Draw Extent" alt="Click and then draw an extent on the map"/>
+            </div>
+            <br/>
+            <div id="extentOutput" dojotype="dijit.form.Textarea" style="width:17em;">The extent's geometry JSON will end up here!</div>
+          </div>
+        </div>
+      </div>
+      <div dojotype="dijit.layout.ContentPane" id="mapPane" region="center">
+        <div id="currentMapWkid">
+        </div>
+        <div id="mapScale">
+        </div>
+      </div>
+      <div dojotype="dijit.layout.ContentPane" id="footerPane" region="bottom">
+        <p><b>Note:</b> The map scale will change when you change the coordinate system, sorry...</p>
+      </div>
+    </div>
+  </body>
+</html>
